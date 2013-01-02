@@ -1439,8 +1439,7 @@ to_string_func(JSContext *context,
 static struct JSClass gjs_object_instance_class = {
     "GObject_Object",
     JSCLASS_HAS_PRIVATE |
-    JSCLASS_NEW_RESOLVE |
-    JSCLASS_NEW_RESOLVE_GETS_START,
+    JSCLASS_NEW_RESOLVE,
     JS_PropertyStub,
     JS_PropertyStub,
     object_instance_get_prop,
