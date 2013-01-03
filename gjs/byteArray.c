@@ -62,8 +62,7 @@ static void   byte_array_finalize      (JSContext    *context,
 static struct JSClass gjs_byte_array_class = {
     "ByteArray",
     JSCLASS_HAS_PRIVATE |
-    JSCLASS_NEW_RESOLVE |
-    JSCLASS_NEW_RESOLVE_GETS_START,
+    JSCLASS_NEW_RESOLVE,
     JS_PropertyStub,
     JS_PropertyStub,
     byte_array_get_prop,
@@ -217,8 +216,6 @@ byte_array_get_prop(JSContext *context,
 
     if (priv == NULL)
         return JS_FALSE; /* wrong class passed in */
-    if (priv->array == NULL && priv->bytes == NULL)
-        return JS_TRUE; /* prototype, not an instance. */
 
     if (!JS_IdToValue(context, id, &id_value))
         return JS_FALSE;
@@ -251,8 +248,6 @@ byte_array_length_getter(JSContext *context,
 
     if (priv == NULL)
         return JS_FALSE; /* wrong class passed in */
-    if (priv->array == NULL && priv->bytes == NULL)
-        return JS_TRUE; /* prototype, not an instance. */
 
     if (priv->array != NULL)
         len = priv->array->len;
@@ -275,8 +270,6 @@ byte_array_length_setter(JSContext *context,
 
     if (priv == NULL)
         return JS_FALSE; /* wrong class passed in */
-    if (priv->array == NULL && priv->bytes == NULL)
-        return JS_TRUE; /* prototype, not an instance. */
 
     byte_array_ensure_array(priv);
 
@@ -339,8 +332,6 @@ byte_array_set_prop(JSContext *context,
 
     if (priv == NULL)
         return JS_FALSE; /* wrong class passed in */
-    if (priv->array == NULL && priv->bytes == NULL)
-        return JS_TRUE; /* prototype, not an instance. */
 
     if (!JS_IdToValue(context, id, &id_value))
         return JS_FALSE;
@@ -366,22 +357,6 @@ byte_array_set_prop(JSContext *context,
     return JS_TRUE;
 }
 
-/*
- * Like JSResolveOp, but flags provide contextual information as follows:
- *
- *  JSRESOLVE_QUALIFIED   a qualified property id: obj.id or obj[id], not id
- *  JSRESOLVE_ASSIGNING   obj[id] is on the left-hand side of an assignment
- *  JSRESOLVE_DETECTING   'if (o.p)...' or similar detection opcode sequence
- *  JSRESOLVE_DECLARING   var, const, or function prolog declaration opcode
- *  JSRESOLVE_CLASSNAME   class name used when constructing
- *
- * The *objp out parameter, on success, should be null to indicate that id
- * was not resolved; and non-null, referring to obj or one of its prototypes,
- * if id was resolved.
- *
- * *objp will be the original object the property access was on, rather than the
- * prototype that "obj" may be, due to JSCLASS_NEW_RESOLVE_GETS_START
- */
 static JSBool
 byte_array_new_resolve(JSContext *context,
                        JSObject  *obj,
@@ -392,12 +367,12 @@ byte_array_new_resolve(JSContext *context,
     ByteArrayInstance *priv;
     jsval id_val;
 
-    priv = priv_from_js(context, *objp);
+    *objp = NULL;
+
+    priv = priv_from_js(context, objp);
 
     if (priv == NULL)
-        return JS_FALSE; /* wrong class passed in */
-    if (priv->array == NULL && priv->bytes == NULL)
-        return JS_TRUE; /* prototype, not an instance. */
+        return JS_TRUE; /* wrong class passed in */
 
     if (!JS_IdToValue(context, id, &id_val))
         return JS_FALSE;
@@ -408,12 +383,7 @@ byte_array_new_resolve(JSContext *context,
         gsize idx;
         if (!gjs_value_to_gsize(context, id_val, &idx))
             return JS_FALSE;
-        if (idx >= priv->array->len) {
-            *objp = NULL;
-        } else {
-            /* leave objp set */
-            g_assert(*objp != NULL);
-
+        if (idx < priv->array->len) {
             /* define the property - AAARGH. Best I can tell from
              * reading the source, this is unavoidable...
              * which means using "for each" or "for ... in" on byte
@@ -424,13 +394,15 @@ byte_array_new_resolve(JSContext *context,
              * a property but must define it.
              */
             if (!JS_DefinePropertyById(context,
-                                       *objp,
+                                       obj,
                                        id,
                                        JSVAL_VOID,
                                        byte_array_get_prop,
                                        byte_array_set_prop,
                                        JSPROP_ENUMERATE))
                 return JS_FALSE;
+
+            *objp = obj;
         }
     }
 
