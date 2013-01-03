@@ -197,7 +197,7 @@ gjs_console_interact(JSContext *context,
         /* Note in this case, we are trying to parse the buffer as
          * ISO-8859-1 which is broken for non-ASCII.
          */
-        } while (!JS_BufferIsCompilableUnit(context, object, buffer->str, buffer->len));
+        } while (!JS_BufferIsCompilableUnit(context, JS_TRUE, object, buffer->str, buffer->len));
 
         if ((u16_buffer = g_utf8_to_utf16 (buffer->str, buffer->len, NULL, &u16_buffer_len, &error)) == NULL) {
             g_printerr ("%s\n", error->message);
